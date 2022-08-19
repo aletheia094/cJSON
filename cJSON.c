@@ -304,11 +304,13 @@ typedef struct
 /* Parse the input text to generate a number, and populate the result into item. */
 static cJSON_bool parse_number(cJSON * const item, parse_buffer * const input_buffer)
 {
+    /** TODO: update **/
     double number = 0;
     unsigned char *after_end = NULL;
     unsigned char number_c_string[64];
     unsigned char decimal_point = get_decimal_point();
     size_t i = 0;
+    int has_dec = 0;
 
     if ((input_buffer == NULL) || (input_buffer->content == NULL))
     {
@@ -341,6 +343,7 @@ static cJSON_bool parse_number(cJSON * const item, parse_buffer * const input_bu
 
             case '.':
                 number_c_string[i] = decimal_point;
+                has_dec = 1;
                 break;
 
             default:
@@ -356,23 +359,19 @@ loop_end:
         return false; /* parse_error */
     }
 
+    /* setting valuedouble for int and double right now, since all other number
+       functions haven't been fully modified to support completely distinct types */
     item->valuedouble = number;
 
-    /* use saturation in case of overflow */
-    if (number >= INT_MAX)
+    if (has_dec || (number >= INT_MAX) || (number <= (double)INT_MIN))
     {
-        item->valueint = INT_MAX;
-    }
-    else if (number <= (double)INT_MIN)
-    {
-        item->valueint = INT_MIN;
+        item->type = cJSON_Double;
     }
     else
     {
         item->valueint = (int)number;
+        item->type = cJSON_Int64;
     }
-
-    item->type = cJSON_Number;
 
     input_buffer->offset += (size_t)(after_end - number_c_string);
     return true;
@@ -1373,7 +1372,7 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
         return false;
     }
 
-    switch ((item->type) & 0xFF)
+    switch ((item->type) & 0xFFF)
     {
         case cJSON_NULL:
             output = ensure(output_buffer, 5);
@@ -1402,7 +1401,12 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
             strcpy((char*)output, "true");
             return true;
 
-        case cJSON_Number:
+        case cJSON_Int64:
+            /** TODO: update **/
+            return print_number(item, output_buffer);
+        
+        case cJSON_Double:
+            /** TODO: update **/
             return print_number(item, output_buffer);
 
         case cJSON_Raw:
@@ -2124,9 +2128,9 @@ CJSON_PUBLIC(cJSON*) cJSON_AddBoolToObject(cJSON * const object, const char * co
     return NULL;
 }
 
-CJSON_PUBLIC(cJSON*) cJSON_AddNumberToObject(cJSON * const object, const char * const name, const double number)
+CJSON_PUBLIC(cJSON*) cJSON_AddNumberToObject(cJSON * const object, const char * const name, const double number, int is_int)
 {
-    cJSON *number_item = cJSON_CreateNumber(number);
+    cJSON *number_item = cJSON_CreateNumber(number, is_int);
     if (add_item_to_object(object, name, number_item, &global_hooks, false))
     {
         return number_item;
@@ -2426,12 +2430,18 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateBool(cJSON_bool boolean)
     return item;
 }
 
-CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num)
+CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num, int is_int)
 {
+    /** TODO: update **/
     cJSON *item = cJSON_New_Item(&global_hooks);
     if(item)
     {
-        item->type = cJSON_Number;
+        if (is_int) {
+            item->type = cJSON_Int64;
+        } else {
+            item->type = cJSON_Double;
+        }
+        
         item->valuedouble = num;
 
         /* use saturation in case of overflow */
@@ -2558,7 +2568,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateIntArray(const int *numbers, int count)
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
-        n = cJSON_CreateNumber(numbers[i]);
+        n = cJSON_CreateNumber(numbers[i], 1);
         if (!n)
         {
             cJSON_Delete(a);
@@ -2598,7 +2608,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateFloatArray(const float *numbers, int count)
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
-        n = cJSON_CreateNumber((double)numbers[i]);
+        n = cJSON_CreateNumber((double)numbers[i], 0);
         if(!n)
         {
             cJSON_Delete(a);
@@ -2638,7 +2648,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateDoubleArray(const double *numbers, int count)
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
-        n = cJSON_CreateNumber(numbers[i]);
+        n = cJSON_CreateNumber(numbers[i], 0);
         if(!n)
         {
             cJSON_Delete(a);
@@ -2890,7 +2900,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsInvalid(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_Invalid;
+    return (item->type & 0xFFF) == cJSON_Invalid;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsFalse(const cJSON * const item)
@@ -2900,7 +2910,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsFalse(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_False;
+    return (item->type & 0xFFF) == cJSON_False;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsTrue(const cJSON * const item)
@@ -2910,7 +2920,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsTrue(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xff) == cJSON_True;
+    return (item->type & 0xfff) == cJSON_True;
 }
 
 
@@ -2930,17 +2940,18 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsNull(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_NULL;
+    return (item->type & 0xFFF) == cJSON_NULL;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsNumber(const cJSON * const item)
 {
+    /** TODO: update **/
     if (item == NULL)
     {
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_Number;
+    return ((item->type & 0xFFF) == cJSON_Double) || ((item->type & 0xFFF) == cJSON_Int64);
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsString(const cJSON * const item)
@@ -2950,7 +2961,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsString(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_String;
+    return (item->type & 0xFFF) == cJSON_String;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsArray(const cJSON * const item)
@@ -2960,7 +2971,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsArray(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_Array;
+    return (item->type & 0xFFF) == cJSON_Array;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsObject(const cJSON * const item)
@@ -2970,7 +2981,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsObject(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_Object;
+    return (item->type & 0xFFF) == cJSON_Object;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsRaw(const cJSON * const item)
@@ -2980,23 +2991,24 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsRaw(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFF) == cJSON_Raw;
+    return (item->type & 0xFFF) == cJSON_Raw;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * const b, const cJSON_bool case_sensitive)
 {
-    if ((a == NULL) || (b == NULL) || ((a->type & 0xFF) != (b->type & 0xFF)))
+    if ((a == NULL) || (b == NULL) || ((a->type & 0xFFF) != (b->type & 0xFFF)))
     {
         return false;
     }
 
     /* check if type is valid */
-    switch (a->type & 0xFF)
+    switch (a->type & 0xFFF)
     {
         case cJSON_False:
         case cJSON_True:
         case cJSON_NULL:
-        case cJSON_Number:
+        case cJSON_Double:
+        case cJSON_Int64:
         case cJSON_String:
         case cJSON_Raw:
         case cJSON_Array:
@@ -3013,7 +3025,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * cons
         return true;
     }
 
-    switch (a->type & 0xFF)
+    switch (a->type & 0xFFF)
     {
         /* in these cases and equal type is enough */
         case cJSON_False:
@@ -3021,7 +3033,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * cons
         case cJSON_NULL:
             return true;
 
-        case cJSON_Number:
+        case cJSON_Double:
+        case cJSON_Int64:
             if (compare_double(a->valuedouble, b->valuedouble))
             {
                 return true;
