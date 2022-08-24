@@ -1372,7 +1372,7 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
         return false;
     }
 
-    switch ((item->type) & 0xFFF)
+    switch ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference)
     {
         case cJSON_NULL:
             output = ensure(output_buffer, 5);
@@ -1430,7 +1430,8 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
         case cJSON_String:
             return print_string(item, output_buffer);
 
-        case cJSON_Array:
+        case cJSON_List:
+        case cJSON_Tuple:
             return print_array(item, output_buffer);
 
         case cJSON_Object:
@@ -1523,7 +1524,7 @@ success:
         head->prev = current_item;
     }
 
-    item->type = cJSON_Array;
+    item->type = cJSON_Tuple; /** TODO: update to account for tuple and list cases (?) */
     item->child = head;
 
     input_buffer->offset++;
@@ -2015,7 +2016,7 @@ static void* cast_away_const(const void* string)
 static cJSON_bool add_item_to_object(cJSON * const object, const char * const string, cJSON * const item, const internal_hooks * const hooks, const cJSON_bool constant_key)
 {
     char *new_key = NULL;
-    int new_type = cJSON_Invalid;
+    cJSON_Type new_type = cJSON_Invalid;
 
     if ((object == NULL) || (string == NULL) || (item == NULL) || (object == item))
     {
@@ -2176,9 +2177,9 @@ CJSON_PUBLIC(cJSON*) cJSON_AddObjectToObject(cJSON * const object, const char * 
     return NULL;
 }
 
-CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObject(cJSON * const object, const char * const name)
+CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObject(cJSON * const object, const char * const name, int is_list)
 {
-    cJSON *array = cJSON_CreateArray();
+    cJSON *array = cJSON_CreateArray(is_list);
     if (add_item_to_object(object, name, array, &global_hooks, false))
     {
         return array;
@@ -2502,10 +2503,15 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateObjectReference(const cJSON *child)
     return item;
 }
 
-CJSON_PUBLIC(cJSON *) cJSON_CreateArrayReference(const cJSON *child) {
+CJSON_PUBLIC(cJSON *) cJSON_CreateArrayReference(const cJSON *child, int is_list) {
     cJSON *item = cJSON_New_Item(&global_hooks);
     if (item != NULL) {
-        item->type = cJSON_Array | cJSON_IsReference;
+        if (is_list) {
+            item->type = cJSON_List | cJSON_IsReference;
+        } else {
+            item->type = cJSON_Tuple | cJSON_IsReference;
+        }
+        
         item->child = (cJSON*)cast_away_const(child);
     }
 
@@ -2529,12 +2535,17 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateRaw(const char *raw)
     return item;
 }
 
-CJSON_PUBLIC(cJSON *) cJSON_CreateArray(void)
+CJSON_PUBLIC(cJSON *) cJSON_CreateArray(int is_list)
 {
     cJSON *item = cJSON_New_Item(&global_hooks);
     if(item)
     {
-        item->type=cJSON_Array;
+        if (is_list) {
+            item->type = cJSON_List;
+        } else {
+            // assume tuple
+            item->type = cJSON_Tuple;
+        }
     }
 
     return item;
@@ -2564,7 +2575,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateIntArray(const int *numbers, int count)
         return NULL;
     }
 
-    a = cJSON_CreateArray();
+    a = cJSON_CreateArray(1);
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
@@ -2604,7 +2615,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateFloatArray(const float *numbers, int count)
         return NULL;
     }
 
-    a = cJSON_CreateArray();
+    a = cJSON_CreateArray(1);
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
@@ -2644,7 +2655,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateDoubleArray(const double *numbers, int count)
         return NULL;
     }
 
-    a = cJSON_CreateArray();
+    a = cJSON_CreateArray(1);
 
     for(i = 0; a && (i < (size_t)count); i++)
     {
@@ -2684,7 +2695,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateStringArray(const char *const *strings, int co
         return NULL;
     }
 
-    a = cJSON_CreateArray();
+    a = cJSON_CreateArray(1);
 
     for (i = 0; a && (i < (size_t)count); i++)
     {
@@ -2900,7 +2911,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsInvalid(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_Invalid;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Invalid;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsFalse(const cJSON * const item)
@@ -2910,7 +2921,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsFalse(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_False;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_False;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsTrue(const cJSON * const item)
@@ -2920,7 +2931,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsTrue(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xfff) == cJSON_True;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_True;
 }
 
 
@@ -2940,7 +2951,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsNull(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_NULL;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_NULL;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsNumber(const cJSON * const item)
@@ -2951,7 +2962,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsNumber(const cJSON * const item)
         return false;
     }
 
-    return ((item->type & 0xFFF) == cJSON_Double) || ((item->type & 0xFFF) == cJSON_Int64);
+    return (((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Double) ||
+            (((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Int64);
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsString(const cJSON * const item)
@@ -2961,7 +2973,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsString(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_String;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_String;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsArray(const cJSON * const item)
@@ -2971,7 +2983,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsArray(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_Array;
+    return (((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Tuple) ||
+            (((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_List);
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsObject(const cJSON * const item)
@@ -2981,7 +2994,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsObject(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_Object;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Object;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsRaw(const cJSON * const item)
@@ -2991,18 +3004,18 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsRaw(const cJSON * const item)
         return false;
     }
 
-    return (item->type & 0xFFF) == cJSON_Raw;
+    return ((item->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) == cJSON_Raw;
 }
 
 CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * const b, const cJSON_bool case_sensitive)
 {
-    if ((a == NULL) || (b == NULL) || ((a->type & 0xFFF) != (b->type & 0xFFF)))
+    if ((a == NULL) || (b == NULL) || (((a->type & ~cJSON_StringIsConst) & ~cJSON_IsReference) != ((b->type & ~cJSON_StringIsConst) & ~cJSON_IsReference)))
     {
         return false;
     }
 
     /* check if type is valid */
-    switch (a->type & 0xFFF)
+    switch ((a->type & ~cJSON_StringIsConst) & ~cJSON_IsReference)
     {
         case cJSON_False:
         case cJSON_True:
@@ -3011,7 +3024,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * cons
         case cJSON_Int64:
         case cJSON_String:
         case cJSON_Raw:
-        case cJSON_Array:
+        case cJSON_Tuple:
+        case cJSON_List:
         case cJSON_Object:
             break;
 
@@ -3025,7 +3039,7 @@ CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * cons
         return true;
     }
 
-    switch (a->type & 0xFFF)
+    switch ((a->type & ~cJSON_StringIsConst) & ~cJSON_IsReference)
     {
         /* in these cases and equal type is enough */
         case cJSON_False:
@@ -3054,7 +3068,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_Compare(const cJSON * const a, const cJSON * cons
 
             return false;
 
-        case cJSON_Array:
+        case cJSON_Tuple:
+        case cJSON_List:
         {
             cJSON *a_element = a->child;
             cJSON *b_element = b->child;

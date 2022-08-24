@@ -84,19 +84,34 @@ then using the CJSON_API_VISIBILITY flag to "export" the same symbols the way CJ
 #define CJSON_VERSION_PATCH 15
 
 #include <stddef.h>
+#include <stdio.h>
 
 /* cJSON Types: */
-#define cJSON_Invalid (0)
-#define cJSON_False  (1 << 0)
-#define cJSON_True   (1 << 1)
-#define cJSON_NULL   (1 << 2)
-// #define cJSON_Number (1 << 3)
-#define cJSON_Int64  (1 << 3)
-#define cJSON_Double (1 << 4)
-#define cJSON_String (1 << 5)
-#define cJSON_Array  (1 << 6)
-#define cJSON_Object (1 << 7)
-#define cJSON_Raw    (1 << 8) /* raw json */
+typedef enum {
+    cJSON_Invalid,
+    cJSON_False,
+    cJSON_True,
+    cJSON_NULL,
+    cJSON_Int64,
+    cJSON_Double,
+    cJSON_String,
+    cJSON_Tuple,
+    cJSON_List,
+    cJSON_Object,
+    cJSON_Raw /* raw json */
+} cJSON_Type;
+
+// #define cJSON_Invalid 0
+// #define cJSON_False  1
+// #define cJSON_True   (1 << 1)
+// #define cJSON_NULL   (1 << 2)
+// #define cJSON_Int64  (1 << 3)
+// #define cJSON_Double (1 << 4)
+// #define cJSON_String (1 << 5)
+// #define cJSON_Tuple (1 << 6)
+// #define cJSON_List (1 << 7)
+// #define cJSON_Object (1 << 8)
+// #define cJSON_Raw    (1 << 9) /* raw json */
 
 #define cJSON_IsReference 256
 #define cJSON_StringIsConst 512
@@ -202,7 +217,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num, int is_int);
 CJSON_PUBLIC(cJSON *) cJSON_CreateString(const char *string);
 /* raw json */
 CJSON_PUBLIC(cJSON *) cJSON_CreateRaw(const char *raw);
-CJSON_PUBLIC(cJSON *) cJSON_CreateArray(void);
+CJSON_PUBLIC(cJSON *) cJSON_CreateArray(int is_list);
 CJSON_PUBLIC(cJSON *) cJSON_CreateObject(void);
 
 /* Create a string where valuestring references a string so
@@ -211,7 +226,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateStringReference(const char *string);
 /* Create an object/array that only references it's elements so
  * they will not be freed by cJSON_Delete */
 CJSON_PUBLIC(cJSON *) cJSON_CreateObjectReference(const cJSON *child);
-CJSON_PUBLIC(cJSON *) cJSON_CreateArrayReference(const cJSON *child);
+CJSON_PUBLIC(cJSON *) cJSON_CreateArrayReference(const cJSON *child, int is_list);
 
 /* These utilities create an Array of count items.
  * The parameter count cannot be greater than the number of elements in the number array, otherwise array access will be out of bounds.*/
@@ -271,7 +286,7 @@ CJSON_PUBLIC(cJSON*) cJSON_AddNumberToObject(cJSON * const object, const char * 
 CJSON_PUBLIC(cJSON*) cJSON_AddStringToObject(cJSON * const object, const char * const name, const char * const string);
 CJSON_PUBLIC(cJSON*) cJSON_AddRawToObject(cJSON * const object, const char * const name, const char * const raw);
 CJSON_PUBLIC(cJSON*) cJSON_AddObjectToObject(cJSON * const object, const char * const name);
-CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObject(cJSON * const object, const char * const name);
+CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObject(cJSON * const object, const char * const name, int is_list);
 
 /* When assigning an integer value, it needs to be propagated to valuedouble too. */
 #define cJSON_SetIntValue(object, number) ((object) ? (object)->valueint = (object)->valuedouble = (number) : (number))
