@@ -101,18 +101,6 @@ typedef enum {
     cJSON_Raw /* raw json */
 } cJSON_Type;
 
-// #define cJSON_Invalid 0
-// #define cJSON_False  1
-// #define cJSON_True   (1 << 1)
-// #define cJSON_NULL   (1 << 2)
-// #define cJSON_Int64  (1 << 3)
-// #define cJSON_Double (1 << 4)
-// #define cJSON_String (1 << 5)
-// #define cJSON_Tuple (1 << 6)
-// #define cJSON_List (1 << 7)
-// #define cJSON_Object (1 << 8)
-// #define cJSON_Raw    (1 << 9) /* raw json */
-
 #define cJSON_IsReference 256
 #define cJSON_StringIsConst 512
 

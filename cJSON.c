@@ -304,7 +304,6 @@ typedef struct
 /* Parse the input text to generate a number, and populate the result into item. */
 static cJSON_bool parse_number(cJSON * const item, parse_buffer * const input_buffer)
 {
-    /** TODO: update **/
     double number = 0;
     unsigned char *after_end = NULL;
     unsigned char number_c_string[64];
@@ -1402,11 +1401,9 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
             return true;
 
         case cJSON_Int64:
-            /** TODO: update **/
             return print_number(item, output_buffer);
         
         case cJSON_Double:
-            /** TODO: update **/
             return print_number(item, output_buffer);
 
         case cJSON_Raw:
@@ -1524,7 +1521,8 @@ success:
         head->prev = current_item;
     }
 
-    item->type = cJSON_Tuple; /** TODO: update to account for tuple and list cases (?) */
+    /* TODO: update to account for tuple and list cases */
+    item->type = cJSON_Tuple;
     item->child = head;
 
     input_buffer->offset++;
@@ -2433,7 +2431,6 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateBool(cJSON_bool boolean)
 
 CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num, int is_int)
 {
-    /** TODO: update **/
     cJSON *item = cJSON_New_Item(&global_hooks);
     if(item)
     {
@@ -2956,7 +2953,6 @@ CJSON_PUBLIC(cJSON_bool) cJSON_IsNull(const cJSON * const item)
 
 CJSON_PUBLIC(cJSON_bool) cJSON_IsNumber(const cJSON * const item)
 {
-    /** TODO: update **/
     if (item == NULL)
     {
         return false;
